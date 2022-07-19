@@ -50,13 +50,32 @@ public class ProductController {
     }
 
     @PostMapping
-    public Mono<ResponseEntity<Product>> saveProduct(@RequestBody Product product) {
+    public Mono<ResponseEntity<Product>> createProduct(@RequestBody Product product) {
 
         if (product.getCreationDate() == null){
             product.setCreationDate(new Date());
         }
 
         return productService.save(product).map(prod -> ResponseEntity
+                        .created(URI.create("/api/v1/products/".concat(prod.getId())))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(prod));
+    }
+
+    @PostMapping("/withPhoto")
+    public Mono<ResponseEntity<Product>> createProductWithPhoto(Product product, @RequestPart(name = "file") FilePart filePart) {
+
+        if (product.getCreationDate() == null) {
+            product.setCreationDate(new Date());
+        }
+
+        product.setPhoto(UUID.randomUUID() + "-" + filePart.filename()
+                .replace(" ", "")
+                .replace(":", "")
+                .replace("\\", ""));
+
+        return filePart.transferTo(new File(path + product.getPhoto())).then(productService.save(product))
+                .map(prod -> ResponseEntity
                         .created(URI.create("/api/v1/products/".concat(prod.getId())))
                         .contentType(MediaType.APPLICATION_JSON)
                         .body(prod));
