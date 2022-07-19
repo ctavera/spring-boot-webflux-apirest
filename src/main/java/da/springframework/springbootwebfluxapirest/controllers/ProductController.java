@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import reactor.core.publisher.Flux;
@@ -31,5 +32,12 @@ public class ProductController {
                         .contentType(MediaType.APPLICATION_JSON)
                         .body(productService.findAll())
         );
+    }
+
+    @GetMapping("/{id}")
+    public Mono<ResponseEntity<Product>> productDetail(@PathVariable String id) {
+        return productService.findById(id)
+                .map(product -> ResponseEntity.ok().contentType(MediaType.APPLICATION_JSON).body(product))
+                .defaultIfEmpty(ResponseEntity.notFound().build());
     }
 }
