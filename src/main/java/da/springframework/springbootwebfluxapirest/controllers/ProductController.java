@@ -53,4 +53,20 @@ public class ProductController {
                         .contentType(MediaType.APPLICATION_JSON)
                         .body(prod));
     }
+
+    @PutMapping("/{id}")
+    public Mono<ResponseEntity<Product>> updateProduct (@RequestBody Product product, @PathVariable String id) {
+
+        return productService.findById(id)
+                .flatMap(prod -> {
+                    prod.setName(product.getName());
+                    prod.setPrice(product.getPrice());
+                    prod.setCategory(product.getCategory());
+
+                    return productService.save(prod);
+                }).map(prod -> ResponseEntity
+                        .created(URI.create("/api/v1/products".concat(prod.getId())))
+                        .body(prod))
+                .defaultIfEmpty(ResponseEntity.notFound().build());
+    }
 }
