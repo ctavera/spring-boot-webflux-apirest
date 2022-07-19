@@ -3,15 +3,19 @@ package da.springframework.springbootwebfluxapirest.controllers;
 import da.springframework.springbootwebfluxapirest.model.documents.Product;
 import da.springframework.springbootwebfluxapirest.services.ProductService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.web.bind.annotation.*;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import java.io.File;
 import java.net.URI;
 import java.util.Date;
+import java.util.UUID;
 
 @RequiredArgsConstructor
 @RestController
@@ -19,6 +23,9 @@ import java.util.Date;
 public class ProductController {
 
     private final ProductService productService;
+
+    @Value("${config.uploads.path}")
+    private String path;
 
 //    @GetMapping
 //    public Flux<Product> listProducts() {
@@ -77,5 +84,19 @@ public class ProductController {
                 .flatMap(product -> productService.delete(product)
                         .then(Mono.just(new ResponseEntity<Void>(HttpStatus.NO_CONTENT))))
                 .defaultIfEmpty(new ResponseEntity<Void>(HttpStatus.NOT_FOUND));
+    }
+
+    @PostMapping("/upload/{id}")
+    public Mono<ResponseEntity<Product>> uploadPhoto(@PathVariable String id, @RequestPart(name = "file") FilePart filePart) {
+        return productService.findById(id)
+                .flatMap(product -> {
+                    product.setPhoto(UUID.randomUUID() + "-" + filePart.filename()
+                            .replace(" ", "")
+                            .replace(":", "")
+                            .replace("\\", ""));
+
+                    return filePart.transferTo(new File(path + product.getPhoto())).then(productService.save(product));
+                }).map(product -> ResponseEntity.ok(product))
+                .defaultIfEmpty(ResponseEntity.notFound().build());
     }
 }
