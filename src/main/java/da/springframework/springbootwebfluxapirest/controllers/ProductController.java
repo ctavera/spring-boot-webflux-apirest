@@ -3,6 +3,7 @@ package da.springframework.springbootwebfluxapirest.controllers;
 import da.springframework.springbootwebfluxapirest.model.documents.Product;
 import da.springframework.springbootwebfluxapirest.services.ProductService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -68,5 +69,13 @@ public class ProductController {
                         .created(URI.create("/api/v1/products".concat(prod.getId())))
                         .body(prod))
                 .defaultIfEmpty(ResponseEntity.notFound().build());
+    }
+
+    @DeleteMapping("/{id}")
+    public Mono<ResponseEntity<Void>> deleteProduct (@PathVariable String id) {
+        return productService.findById(id)
+                .flatMap(product -> productService.delete(product)
+                        .then(Mono.just(new ResponseEntity<Void>(HttpStatus.NO_CONTENT))))
+                .defaultIfEmpty(new ResponseEntity<Void>(HttpStatus.NOT_FOUND));
     }
 }
