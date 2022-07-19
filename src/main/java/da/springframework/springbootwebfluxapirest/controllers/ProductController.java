@@ -9,12 +9,16 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.support.WebExchangeBindException;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import javax.validation.Valid;
 import java.io.File;
 import java.net.URI;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 @RequiredArgsConstructor
@@ -50,19 +54,41 @@ public class ProductController {
     }
 
     @PostMapping
-    public Mono<ResponseEntity<Product>> createProduct(@RequestBody Product product) {
+    public Mono<ResponseEntity<Map<String, Object>>> createProduct(@Valid @RequestBody Mono<Product> productMono) {
 
-        if (product.getCreationDate() == null){
-            product.setCreationDate(new Date());
-        }
+        Map<String, Object> response = new HashMap<>();
+        return productMono.flatMap(product -> {
+            if (product.getCreationDate() == null){
+                product.setCreationDate(new Date());
+            }
 
-        return productService.save(product).map(prod -> ResponseEntity
+            return productService.save(product).map(prod -> {
+                response.put("product", prod);
+                response.put("message", "Producto creado con éxito");
+                response.put("timestamp", new Date());
+
+                return ResponseEntity
                         .created(URI.create("/api/v1/products/".concat(prod.getId())))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .body(prod));
+                        .body(response);
+            });
+        }).onErrorResume(throwable -> {
+            return Mono.just(throwable).cast(WebExchangeBindException.class)
+                    .flatMap(e -> Mono.just(e.getFieldErrors()))
+                    .flatMapMany(Flux::fromIterable)
+                    .map(fieldError -> "El campo " + fieldError.getField() + " " + fieldError.getDefaultMessage())
+                    .collectList()
+                    .flatMap(list -> {
+                        response.put("errors", list);
+                        response.put("timestamp", new Date());
+                        response.put("status", HttpStatus.BAD_REQUEST.value());
+
+                        return Mono.just(ResponseEntity.badRequest().body(response));
+                    });
+        });
     }
 
-    @PostMapping("/withPhoto")
+    @PostMapping("/withPhoto")// anti-pattern, must be v2 by example
     public Mono<ResponseEntity<Product>> createProductWithPhoto(Product product, @RequestPart(name = "file") FilePart filePart) {
 
         if (product.getCreationDate() == null) {
