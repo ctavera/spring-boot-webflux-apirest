@@ -51,4 +51,23 @@ public class ProductHandler {
                 .body(fromValue(product))
         );
     }
+
+    public Mono<ServerResponse> updateProduct(ServerRequest request) {
+
+        Mono<Product> productMono = request.bodyToMono(Product.class);
+        String id = request.pathVariable("id");
+
+        Mono<Product> productMonoDB = productService.findById(id);
+
+        return productMonoDB.zipWith(productMono, (productDB, productRequest) -> {
+            productDB.setName(productRequest.getName());
+            productDB.setPrice(productRequest.getPrice());
+            productDB.setCategory(productRequest.getCategory());
+
+            return productDB;
+        }).flatMap(product -> ServerResponse.created(URI.create("/api/v2/products" + product.getId()))
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(productService.save(product), Product.class)
+        ).switchIfEmpty(ServerResponse.notFound().build());
+    }
 }
