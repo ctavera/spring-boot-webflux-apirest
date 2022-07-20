@@ -56,7 +56,7 @@ public class ProductController {
     @PostMapping
     public Mono<ResponseEntity<Map<String, Object>>> createProduct(@Valid @RequestBody Mono<Product> productMono) {
 
-        Map<String, Object> response = new HashMap<>();
+        Map<String, Object> response = new HashMap<>(); //needed for response of product or list of errors
         return productMono.flatMap(product -> {
             if (product.getCreationDate() == null){
                 product.setCreationDate(new Date());
@@ -64,6 +64,7 @@ public class ProductController {
 
             return productService.save(product).map(prod -> {
                 response.put("product", prod);
+                //Not necessary, only for example
                 response.put("message", "Producto creado con éxito");
                 response.put("timestamp", new Date());
 
@@ -72,20 +73,20 @@ public class ProductController {
                         .contentType(MediaType.APPLICATION_JSON)
                         .body(response);
             });
-        }).onErrorResume(throwable -> {
-            return Mono.just(throwable).cast(WebExchangeBindException.class)
-                    .flatMap(e -> Mono.just(e.getFieldErrors()))
-                    .flatMapMany(Flux::fromIterable)
-                    .map(fieldError -> "El campo " + fieldError.getField() + " " + fieldError.getDefaultMessage())
-                    .collectList()
-                    .flatMap(list -> {
-                        response.put("errors", list);
-                        response.put("timestamp", new Date());
-                        response.put("status", HttpStatus.BAD_REQUEST.value());
+        }).onErrorResume(throwable -> Mono.just(throwable).cast(WebExchangeBindException.class) //cast the exception to a Mono<WebExchangeBindException>
+                .flatMap(e -> Mono.just(e.getFieldErrors())) //transform into Mono<List>
+                .flatMapMany(Flux::fromIterable)//transform into Flux to iterate errors
+                .map(fieldError -> "El campo " + fieldError.getField() + " " + fieldError.getDefaultMessage())//transform each error on String
+                .collectList()//transform the Flux into Mono<List>
+                .flatMap(list -> { //transform the Mono<List> in a Mono<ResponseEntity<Map>>
+                    response.put("errors", list);
+                    //Not necessary, only for example
+                    response.put("timestamp", new Date());
+                    response.put("status", HttpStatus.BAD_REQUEST.value());
 
-                        return Mono.just(ResponseEntity.badRequest().body(response));
-                    });
-        });
+                    return Mono.just(ResponseEntity.badRequest().body(response));
+                })
+        );
     }
 
     @PostMapping("/withPhoto")// anti-pattern, must be v2 by example
