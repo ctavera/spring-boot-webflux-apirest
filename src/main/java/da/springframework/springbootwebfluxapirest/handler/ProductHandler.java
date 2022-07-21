@@ -1,11 +1,13 @@
 package da.springframework.springbootwebfluxapirest.handler;
 
+import da.springframework.springbootwebfluxapirest.model.documents.Category;
 import da.springframework.springbootwebfluxapirest.model.documents.Product;
 import da.springframework.springbootwebfluxapirest.services.ProductService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.http.codec.multipart.FilePart;
+import org.springframework.http.codec.multipart.FormFieldPart;
 import org.springframework.stereotype.Component;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
@@ -108,5 +110,39 @@ public class ProductHandler {
                         .contentType(MediaType.APPLICATION_JSON)
                         .body(fromValue(product))
                 ).switchIfEmpty(ServerResponse.notFound().build());
+    }
+
+    public Mono<ServerResponse> createProductWithPhoto(ServerRequest request) {
+
+        Mono<Product> productMono = request.multipartData().map(stringPartMultiValueMap -> {
+            FormFieldPart name = (FormFieldPart) stringPartMultiValueMap.toSingleValueMap().get("name");
+            FormFieldPart price = (FormFieldPart) stringPartMultiValueMap.toSingleValueMap().get("price");
+            FormFieldPart categoryId = (FormFieldPart) stringPartMultiValueMap.toSingleValueMap().get("category.id");
+            FormFieldPart categoryName = (FormFieldPart) stringPartMultiValueMap.toSingleValueMap().get("category.name");
+
+            Category category = new Category(categoryName.value());
+            category.setId(categoryId.value());
+
+            return new Product(name.value(), Double.parseDouble(price.value()), category);
+        });
+
+        return request.multipartData().map(stringPartMultiValueMap -> stringPartMultiValueMap.toSingleValueMap().get("file"))
+                .cast(FilePart.class)
+                .flatMap(filePart -> productMono
+                        .flatMap(product -> {
+                            product.setCreationDate(new Date());
+                            product.setPhoto(UUID.randomUUID() + "-" + filePart.filename()
+                                    .replace(" ", "")
+                                    .replace(":", "")
+                                    .replace("\\", "")
+                            );
+
+                            return filePart.transferTo(new File(path + product.getPhoto()))
+                                    .then(productService.save(product));
+                        })
+                ).flatMap(product -> ServerResponse.created(URI.create("/api/v2/products/" + product.getId()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(fromValue(product))
+                );
     }
 }
