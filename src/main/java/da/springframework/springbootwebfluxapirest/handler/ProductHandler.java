@@ -9,8 +9,12 @@ import org.springframework.http.MediaType;
 import org.springframework.http.codec.multipart.FilePart;
 import org.springframework.http.codec.multipart.FormFieldPart;
 import org.springframework.stereotype.Component;
+import org.springframework.validation.BeanPropertyBindingResult;
+import org.springframework.validation.Errors;
+import org.springframework.validation.Validator;
 import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
+import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
 import java.io.File;
@@ -25,6 +29,8 @@ import static org.springframework.web.reactive.function.BodyInserters.fromValue;
 public class ProductHandler {
 
     private final ProductService productService;
+
+    private final Validator validator;
 
     @Value("${config.uploads.path}")
     private String path;
@@ -50,15 +56,25 @@ public class ProductHandler {
         Mono<Product> productMono = request.bodyToMono(Product.class);
         return productMono.flatMap(product -> {
 
-            if (product.getCreationDate() == null) {
-                product.setCreationDate(new Date());
-            }
+            Errors errors = new BeanPropertyBindingResult(product, Product.class.getName());
+            validator.validate(product, errors);
 
-            return productService.save(product);
-        }).flatMap(product -> ServerResponse.created(URI.create("/api/v2/products/" + product.getId()))
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(fromValue(product))
-        );
+            if (!errors.hasErrors()) {
+                if (product.getCreationDate() == null) {
+                    product.setCreationDate(new Date());
+                }
+
+                return productService.save(product).flatMap(productDB -> ServerResponse.created(URI.create("/api/v2/products/" + productDB.getId()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .body(fromValue(productDB))
+                );
+            } else {
+                return Flux.fromIterable(errors.getFieldErrors())
+                        .map(fieldError -> "El campo " + fieldError.getField() + " " + fieldError.getDefaultMessage())
+                        .collectList()
+                        .flatMap(errorsStrings -> ServerResponse.badRequest().body(fromValue(errorsStrings)));
+            }
+        });
     }
 
     public Mono<ServerResponse> updateProduct(ServerRequest request) {
