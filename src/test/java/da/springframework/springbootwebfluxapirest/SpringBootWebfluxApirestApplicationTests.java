@@ -128,4 +128,20 @@ class SpringBootWebfluxApirestApplicationTests {
                 .jsonPath("$.name").isEqualTo("PS5")
                 .jsonPath("$.category.name", "Electrónico");
     }
+
+    @Test
+    void testDeleteProduct() {
+
+        Product product = productService.findByName("HP Notebook Omen 17").block();
+
+        webTestClient.delete().uri("/api/v2/products/{id}", Collections.singletonMap("id", product.getId()))
+                .exchange()
+                .expectStatus().isNoContent()
+                .expectBody().isEmpty();
+
+        webTestClient.get().uri("/api/v2/products/{id}", Collections.singletonMap("id", product.getId()))
+                .exchange()
+                .expectStatus().isNotFound()
+                .expectBody().isEmpty();
+    }
 }
