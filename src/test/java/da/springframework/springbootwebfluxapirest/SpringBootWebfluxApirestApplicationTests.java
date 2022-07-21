@@ -109,4 +109,23 @@ class SpringBootWebfluxApirestApplicationTests {
                     Assertions.assertEquals("Electrónico", productResult.getCategory().getName());
                 });
     }
+
+    @Test
+    void testUpdateProduct() {
+        Product product = productService.findByName("Mica Cómoda 5 Cajones").block();
+        Category category = productService.findCategoryByName("Electrónico").block();
+
+        Product editedProduct = new Product("PS5", 599.99, category);
+
+        webTestClient.put().uri("/api/v2/products/{id}", Collections.singletonMap("id", product.getId()))
+                .contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.APPLICATION_JSON)
+                .body(Mono.just(editedProduct), Product.class)
+                .exchange()
+                .expectStatus().isCreated()
+                .expectHeader().contentType(MediaType.APPLICATION_JSON)
+                .expectBody()
+                .jsonPath("$.name").isEqualTo("PS5")
+                .jsonPath("$.category.name", "Electrónico");
+    }
 }
