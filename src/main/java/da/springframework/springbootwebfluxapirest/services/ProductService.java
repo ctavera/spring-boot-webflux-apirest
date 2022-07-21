@@ -7,21 +7,25 @@ import reactor.core.publisher.Mono;
 
 public interface ProductService {
 
-    public Flux<Product> findAll();
+    Flux<Product> findAll();
 
-    public Flux<Product> findAllByNameUpperCase();
+    Flux<Product> findAllByNameUpperCase();
 
-    public Flux<Product> findAllByNameUpperCaseRepeat();
+    Flux<Product> findAllByNameUpperCaseRepeat();
 
-    public Mono<Product> findById(String id);
+    Mono<Product> findById(String id);
 
-    public Mono<Product> save(Product product);
+    Mono<Product> save(Product product);
 
-    public Mono<Void> delete(Product product);
+    Mono<Void> delete(Product product);
 
-    public Flux<Category> findAllCategories();
+    Flux<Category> findAllCategories();
 
-    public Mono<Category> findCategoryById(String id);
+    Mono<Category> findCategoryById(String id);
 
-    public Mono<Category> saveCategory(Category category);
+    Mono<Category> saveCategory(Category category);
+
+    Mono<Product> findByName(String name);
+
+    Mono<Product> customObtainByName(String name);
 }
