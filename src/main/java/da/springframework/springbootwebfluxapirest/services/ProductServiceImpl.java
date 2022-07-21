@@ -75,4 +75,9 @@ public class ProductServiceImpl implements ProductService {
     public Mono<Product> customObtainByName(String name) {
         return productRepository.customObtainByName(name);
     }
+
+    @Override
+    public Mono<Category> findCategoryByName(String name) {
+        return categoryRepository.findByName(name);
+    }
 }

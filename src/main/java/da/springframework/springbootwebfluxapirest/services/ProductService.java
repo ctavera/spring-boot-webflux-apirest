@@ -28,4 +28,6 @@ public interface ProductService {
     Mono<Product> findByName(String name);
 
     Mono<Product> customObtainByName(String name);
+
+    Mono<Category> findCategoryByName(String name);
 }

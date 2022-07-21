@@ -1,5 +1,6 @@
 package da.springframework.springbootwebfluxapirest;
 
+import da.springframework.springbootwebfluxapirest.model.documents.Category;
 import da.springframework.springbootwebfluxapirest.model.documents.Product;
 import da.springframework.springbootwebfluxapirest.services.ProductService;
 import org.junit.jupiter.api.Assertions;
@@ -8,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
+import reactor.core.publisher.Mono;
 
 import java.util.Collections;
 import java.util.List;
@@ -64,5 +66,47 @@ class SpringBootWebfluxApirestApplicationTests {
 //                .expectBody() //same as above
 //                .jsonPath("$.id").isNotEmpty()
 //                .jsonPath("$.name").isEqualTo("TV Panasonic Pantalla LCD");
+    }
+
+    @Test
+    void testCreateProduct() {
+
+        Category category = productService.findCategoryByName("Electrónico").block();
+        Product product = new Product("PS5", 599.99, category);
+
+        webTestClient.post().uri("/api/v2/products")
+                .contentType(MediaType.APPLICATION_JSON) //request MediaType
+                .accept(MediaType.APPLICATION_JSON) //response MediaType
+                .body(Mono.just(product), Product.class)
+                .exchange()
+                .expectStatus().isCreated()
+                .expectHeader().contentType(MediaType.APPLICATION_JSON)
+                .expectBody()
+                .jsonPath("$.id").isNotEmpty()
+                .jsonPath("$.name").isEqualTo("PS5")
+                .jsonPath("$.category.name").isEqualTo("Electrónico");
+    }
+
+    @Test
+    void testCreateProduct2() {
+
+        Category category = productService.findCategoryByName("Electrónico").block();
+        Product product = new Product("PS5", 599.99, category);
+
+        webTestClient.post().uri("/api/v2/products")
+                .contentType(MediaType.APPLICATION_JSON) //request MediaType
+                .accept(MediaType.APPLICATION_JSON) //response MediaType
+                .body(Mono.just(product), Product.class)
+                .exchange()
+                .expectStatus().isCreated()
+                .expectHeader().contentType(MediaType.APPLICATION_JSON)
+                .expectBody(Product.class)
+                .consumeWith(productEntityExchangeResult -> {
+                    Product productResult = productEntityExchangeResult.getResponseBody();
+
+                    Assertions.assertNotNull(productResult.getId());
+                    Assertions.assertEquals("PS5", productResult.getName());
+                    Assertions.assertEquals("Electrónico", productResult.getCategory().getName());
+                });
     }
 }
