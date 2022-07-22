@@ -1,17 +1,21 @@
 package da.springframework.springbootwebfluxapirest;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import da.springframework.springbootwebfluxapirest.model.documents.Category;
 import da.springframework.springbootwebfluxapirest.model.documents.Product;
 import da.springframework.springbootwebfluxapirest.services.ProductService;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import reactor.core.publisher.Mono;
 
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -23,11 +27,14 @@ class SpringBootWebfluxApirestApplicationTests {
     @Autowired
     private ProductService productService;
 
+    @Value("${config.base.endpoint.url}")
+    private String url;
+
     @Test
     void testListProducts() {
 
         webTestClient.get()
-                .uri("/api/v2/products")
+                .uri(url)
                 .accept(MediaType.APPLICATION_JSON)
                 .exchange()
                 .expectStatus().isOk()
@@ -50,7 +57,7 @@ class SpringBootWebfluxApirestApplicationTests {
         Product product = productService.findByName("TV Panasonic Pantalla LCD").block();
 
         webTestClient.get()
-                .uri("/api/v2/products/{id}", Collections.singletonMap("id", product.getId()))
+                .uri(url + "/{id}", Collections.singletonMap("id", product.getId()))
                 .accept(MediaType.APPLICATION_JSON)
                 .exchange()
                 .expectStatus().isOk()
@@ -74,7 +81,7 @@ class SpringBootWebfluxApirestApplicationTests {
         Category category = productService.findCategoryByName("Electrónico").block();
         Product product = new Product("PS5", 599.99, category);
 
-        webTestClient.post().uri("/api/v2/products")
+        webTestClient.post().uri(url)
                 .contentType(MediaType.APPLICATION_JSON) //request MediaType
                 .accept(MediaType.APPLICATION_JSON) //response MediaType
                 .body(Mono.just(product), Product.class)
@@ -82,9 +89,9 @@ class SpringBootWebfluxApirestApplicationTests {
                 .expectStatus().isCreated()
                 .expectHeader().contentType(MediaType.APPLICATION_JSON)
                 .expectBody()
-                .jsonPath("$.id").isNotEmpty()
-                .jsonPath("$.name").isEqualTo("PS5")
-                .jsonPath("$.category.name").isEqualTo("Electrónico");
+                .jsonPath("$." + (url.contains("v1") ? "product." : "") + "id").isNotEmpty()
+                .jsonPath("$." + (url.contains("v1") ? "product." : "") + "name").isEqualTo("PS5")
+                .jsonPath("$." + (url.contains("v1") ? "product." : "") + "category.name").isEqualTo("Electrónico");
     }
 
     @Test
@@ -93,21 +100,41 @@ class SpringBootWebfluxApirestApplicationTests {
         Category category = productService.findCategoryByName("Electrónico").block();
         Product product = new Product("PS5", 599.99, category);
 
-        webTestClient.post().uri("/api/v2/products")
-                .contentType(MediaType.APPLICATION_JSON) //request MediaType
-                .accept(MediaType.APPLICATION_JSON) //response MediaType
-                .body(Mono.just(product), Product.class)
-                .exchange()
-                .expectStatus().isCreated()
-                .expectHeader().contentType(MediaType.APPLICATION_JSON)
-                .expectBody(Product.class)
-                .consumeWith(productEntityExchangeResult -> {
-                    Product productResult = productEntityExchangeResult.getResponseBody();
+        if (url.contains("v1")) {
+            webTestClient.post().uri(url)
+                    .contentType(MediaType.APPLICATION_JSON) //request MediaType
+                    .accept(MediaType.APPLICATION_JSON) //response MediaType
+                    .body(Mono.just(product), Product.class)
+                    .exchange()
+                    .expectStatus().isCreated()
+                    .expectHeader().contentType(MediaType.APPLICATION_JSON)
+                    .expectBody(new ParameterizedTypeReference<LinkedHashMap<String, Object>>() {
+                    })
+                    .consumeWith(productEntityExchangeResult -> {
+                        Object object = productEntityExchangeResult.getResponseBody().get("product");
+                        Product productResult = new ObjectMapper().convertValue(object, Product.class);
 
-                    Assertions.assertNotNull(productResult.getId());
-                    Assertions.assertEquals("PS5", productResult.getName());
-                    Assertions.assertEquals("Electrónico", productResult.getCategory().getName());
-                });
+                        Assertions.assertNotNull(productResult.getId());
+                        Assertions.assertEquals("PS5", productResult.getName());
+                        Assertions.assertEquals("Electrónico", productResult.getCategory().getName());
+                    });
+        } else {
+            webTestClient.post().uri(url)
+                    .contentType(MediaType.APPLICATION_JSON) //request MediaType
+                    .accept(MediaType.APPLICATION_JSON) //response MediaType
+                    .body(Mono.just(product), Product.class)
+                    .exchange()
+                    .expectStatus().isCreated()
+                    .expectHeader().contentType(MediaType.APPLICATION_JSON)
+                    .expectBody(Product.class)
+                    .consumeWith(productEntityExchangeResult -> {
+                        Product productResult = productEntityExchangeResult.getResponseBody();
+
+                        Assertions.assertNotNull(productResult.getId());
+                        Assertions.assertEquals("PS5", productResult.getName());
+                        Assertions.assertEquals("Electrónico", productResult.getCategory().getName());
+                    });
+        }
     }
 
     @Test
@@ -117,7 +144,7 @@ class SpringBootWebfluxApirestApplicationTests {
 
         Product editedProduct = new Product("PS5", 599.99, category);
 
-        webTestClient.put().uri("/api/v2/products/{id}", Collections.singletonMap("id", product.getId()))
+        webTestClient.put().uri(url + "/{id}", Collections.singletonMap("id", product.getId()))
                 .contentType(MediaType.APPLICATION_JSON)
                 .accept(MediaType.APPLICATION_JSON)
                 .body(Mono.just(editedProduct), Product.class)
@@ -134,12 +161,12 @@ class SpringBootWebfluxApirestApplicationTests {
 
         Product product = productService.findByName("HP Notebook Omen 17").block();
 
-        webTestClient.delete().uri("/api/v2/products/{id}", Collections.singletonMap("id", product.getId()))
+        webTestClient.delete().uri(url + "/{id}", Collections.singletonMap("id", product.getId()))
                 .exchange()
                 .expectStatus().isNoContent()
                 .expectBody().isEmpty();
 
-        webTestClient.get().uri("/api/v2/products/{id}", Collections.singletonMap("id", product.getId()))
+        webTestClient.get().uri(url + "/{id}", Collections.singletonMap("id", product.getId()))
                 .exchange()
                 .expectStatus().isNotFound()
                 .expectBody().isEmpty();
